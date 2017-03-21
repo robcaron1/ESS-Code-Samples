@@ -1,0 +1,16 @@
+<CF_SSI virtual="/ssi/apps/header.txt">
+ReturnTo("UP Employee Home","/emp");
+<!--- ReturnTo("Departments","/emp/depts.shtml"); --->
+ReturnTo("Operating","/emp/operating/");
+ReturnTo("Crew Management","../../index.cfm");
+AppName("Real-Time MPV Tracking System","RVT_Main.cfm");
+<!--- Required to be called from a securied project --->
+<!--- <cfmodule template="../customtags/securitylevel.cfm"> --->
+SubMenusControlHide();
+MenuOptions("MPV Tracking System Options","#","3");
+SubMenuOptions("1","Real-Time MPV Tracking System","./RVT_Main.cfm", "1");
+SubMenuOptions("1","Enter Historical MPV Record","archive/RVT_EnterHistorical.cfm", "1");
+SubMenuOptions("1","Retrieve Historical MPV Records By Date","archive/RVT_Main.cfm", "1");
+Splash();
+// -->
+</SCRIPT>

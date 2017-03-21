@@ -1,0 +1,461 @@
+<!--- Main Query --->
+<cfquery name="Source" datasource="CMS_RVT">
+	dbo.usp_RVT_MAIN_DATA_SOURCE
+</cfquery>
+
+<cfquery  name="CityList" datasource="CMS_RVT">
+	SELECT DISTINCT
+		VanMgtArea AS CITY,
+  HubState AS STATE
+	FROM
+		dbo.RVT_Hub_Loc
+ WHERE
+  VanMgtArea > ''
+  AND HubState> ''
+	ORDER BY
+		VanMgtArea
+</cfquery>
+
+<cfquery name="FilteredQuerySource" datasource="CMS_RVT">
+	dbo.usp_RVT_MAIN_DATA_SOURCE_12HRS
+</cfquery>
+
+<cfquery name="VanSource" datasource="CMS_RVT">
+	SELECT DISTINCT
+  SeqNbr,
+  VanNbr
+ FROM
+  dbo.RVT_Vans
+ ORDER BY
+  VanNbr
+</cfquery>
+
+<cfquery  name="FilteredQuery" dbtype="query">
+	SELECT DISTINCT
+  *
+	FROM
+		FilteredQuerySource
+ WHERE
+  1 = 1
+<cfif isDefined("url.Hub_Filter") and #url.Hub_Filter# neq ''>
+  AND Upper(VanMgtArea) + Upper(HubState) = '#UCase(url.Hub_Filter)#'
+</cfif>
+	ORDER BY
+   VanMgtArea,
+	<cfif IsDefined("url.sortVanBy") IS TRUE AND "#url.sortVanBy#" eq "DESC">
+   		VanNbr DESC,
+   		OrderDate DESC,
+   		OrderTime DESC,
+	<cfelseif IsDefined("url.sortVanBy") IS TRUE AND "#url.sortVanBy#" eq "ASC">
+   		VanNbr ASC,
+   		OrderDate DESC,
+   		OrderTime DESC,
+	<cfelseif IsDefined("url.sortOrderBy") IS TRUE AND "#url.sortOrderBy#" eq "DESC">
+   		OrderDate DESC,
+   		OrderTime DESC,
+   		VanNbr,
+	<cfelseif IsDefined("url.sortOrderBy") IS TRUE AND "#url.sortOrderBy#" eq "ASC">
+   		OrderDate ASC,
+   		OrderTime ASC,
+   		VanNbr,
+	<cfelse>
+	   	OrderDate DESC,
+   		OrderTime DESC,
+   		VanNbr,
+	</cfif>
+   Segment DESC
+</cfquery>
+
+<cfquery name="VanQuery" datasource="CMS_RVT">
+ dbo.usp_RVT_Van_Info
+</cfquery>
+
+<cfquery  name="FilteredVanQuery" dbtype="query">
+	SELECT DISTINCT
+  *
+	FROM
+		VanQuery
+ WHERE
+  1 = 1
+<cfif isDefined("url.Hub_Filter") and #url.Hub_Filter# neq ''>
+  AND Upper(VanHub)= '#UCase(url.Hub_Filter)#'
+</cfif>
+</cfquery>
+
+<!--- Variable List --->
+
+<html>
+<head>
+	<title>MPV Tracking System</title>
+ <CF_SSI virtual="/ssi/apps/headwhite.txt">
+	<CF_SSI virtual="/ssi/apps/groupbox/groupbox.txt">
+	<CF_SSI VIRTUAL="/ssi/apps/required/required.txt">
+	<CF_SSI VIRTUAL="/ssi/apps/tooltip/tooltip.txt">
+	<CF_SSI VIRTUAL="/ssi/apps/pleasewait/inlinePleaseWait.txt">
+	<script language="javascript">
+		<!--
+			function SubmitComplete(){
+				document.main.submit();
+			}
+
+			function SubmitInComplete(){
+				document.main.submit();
+			}
+
+			function ApplyFilter(){
+				inlinePleaseWaitSubmit(main,1);
+				document.main.action = "./RVT_Main.cfm";
+				document.main.submit();
+			}
+
+			function NewRecord(){
+    //alert('Not Active Yet');
+				inlinePleaseWaitSubmit(main,1);
+				document.main.action = "./RVT_New.cfm";
+				document.main.submit();
+			}
+
+			function EditRecord(RVT_ID, VanNbr, OrderDate, OrderTime){
+    //alert(RVT_ID);
+				inlinePleaseWaitSubmit(main,1);
+				document.main.action = "./RVT_Edit.cfm";
+    document.main.RVT_ID.value = RVT_ID;
+	document.main.VanNbr.value = VanNbr;
+	document.main.OrderDate.value = OrderDate;
+	document.main.OrderTime.value = OrderTime;
+				document.main.submit();
+			}
+
+			function ClearFilters(){
+				<cfset session.Hub_Filter = "">
+				document.main.CityFilter.value = "<cfoutput></cfoutput>";
+				document.main.action = "./RVT_Main.cfm";
+				document.main.submit();
+			}
+
+			function showhide(SpanItem,low,high){
+					imageval= document.getElementById('row'+SpanItem + "image")
+					for(i=low; i<=high; i++){
+						spanval= document.getElementById('row'+i)
+						if (spanval.style.display=='none'){
+							spanval.style.display='';
+							imageval.src = '../images/twistie_open.gif';
+						}else{
+							spanval.style.display='none';
+							imageval.src = '../images/twistie_closed.gif';
+						}
+					}
+			}
+		//-->
+	</script>
+	<style>
+		table.InnerTable {
+			border: 0;
+			padding: 0;
+			margin: 0;
+		}
+		table.InnerTable td {
+			font-family: Verdana, Arial, Helvetica, sans-serif;
+			font-size: xx-small;
+			margin: 0px;
+		}
+
+		table.InnerTable A, table.InnerTable A:link, table.InnerTable A:visited, table.InnerTable A:hover  {
+			font-family: Verdana, Arial, Helvetica, sans-serif;
+			font-size: xx-small;
+		}
+
+		table.InnerTable td.end {
+			border: 0;
+		}
+		table.InnerTable table {
+			border: 0px;
+		}
+
+		table.InnerTable .Mylabel td,
+		table.InnerTable td.Mylabel {
+			font-family : Verdana;
+			font-weight : bold;
+			font-size: 10px;
+		}
+		table.InnerTable .InnerText td,
+		table.InnerTable td.InnerText {
+			font-family: Verdana, Arial, Helvetica, sans-serif;
+			font-size: xx-small;
+		}
+
+<!--- 		table.InnerTable {
+			border: 0;
+			padding: 0;
+			margin: 0;
+   width: 600px;
+		}
+  
+		table.InnerTable td {
+			font-family: Verdana, Arial, Helvetica, sans-serif;
+			font-size: xx-small;
+			margin: 0px;
+		}
+
+		table.InnerTable A, table.InnerTable A:link, table.InnerTable A:visited, table.InnerTable A:hover  {
+			font-family: Verdana, Arial, Helvetica, sans-serif;
+			font-size: xx-small;
+		}
+
+		table.InnerTable td.end {
+			border: 0;
+		}
+  
+		table.InnerTable table {
+			border: 0px;
+   width: 600px;
+		}
+
+		table.InnerTable .Mylabel td,
+		table.InnerTable td.Mylabel {
+			font-family : Verdana;
+			font-weight : bold;
+			font-size: 10px;
+		}
+  
+		table.InnerTable .InnerText td,
+		table.InnerTable td.InnerText {
+			font-family: Verdana, Arial, Helvetica, sans-serif;
+			font-size: xx-small;
+		}
+  
+  td.TopRow {
+   border-top-style: solid;
+   border-top-width: 1px;
+  }
+ --->	</style>
+</head>
+<body>
+	<cfmodule template="./RVT_menubar.cfm">
+	<CF_SSI VIRTUAL="/ssi/apps/pleasewait/inlinePleaseWaitStart.txt">
+	<table cellpadding="0" cellspacing="0" border="0" align="center">
+		<tr>
+			<td>
+				<table cellpadding="0" cellspacing="0" border="0" align="center">
+					<tr>
+						<td>
+							<form action="" method="_URL_" name="main" onSubmit="return checkValidateFields('PleaseWait');">
+							<script language="JavaScript">
+							<!--
+							StartGroupBox("Options","ALIGN: CENTER", "WIDTH: 350");
+							// -->
+							</script>
+							<table cellpadding="0" cellspacing="0" border="0" width="100%">
+								<tr><td>&nbsp;</td></tr>
+								<tr>
+         <td align="center">
+      				<table cellpadding="0" cellspacing="0" border="0" align="center">
+       				<tr>
+												<td align="right">Hub Filter:&nbsp;</td>
+												<td>
+													<select name="Hub_Filter" size="1" class="txtsv">
+													<option value="" selected="selected"></option>
+												<cfoutput query="CityList">
+            <cfset CityState = #CITY# & #STATE#>
+												<cfif isDefined("url.Hub_Filter") and #url.Hub_Filter# eq #CityState#>
+													<option value="#CityState#" selected="selected">#CITY#, #STATE#</option>
+												<cfelse>
+													<option value="#CityState#">#CITY#, #STATE#</option>
+												</cfif>
+												</cfoutput>
+													</select>
+             <input type="hidden" name="RVT_ID" value="">
+             <input type="hidden" name="VanNbr" value="">
+             <input type="hidden" name="OrderDate" value="">
+             <input type="hidden" name="OrderTime" value="">
+												<cfif isdefined("url.Hub_Filter")>
+													<script language="JavaScript">document.main.Hub_Filter.value = <cfoutput>"#url.Hub_Filter#"</cfoutput>;</script>
+												</cfif>
+												</td>
+            <td>&nbsp;</td>
+   									<td align="center"><input type="button" value="Apply Filter" onclick="ApplyFilter();" class="txtsv"></td>
+   								</tr>
+   							<cfif isDefined("url.Hub_Filter") and #url.Hub_Filter# neq "">
+   								<tr><td colspan="6">&nbsp;</td></tr>
+   								<tr>
+   									<td colspan="6" align="center"><input type="button" value=" New Record " onclick="NewRecord();" class="txtsv"></td>
+   								</tr>
+   							</cfif>
+   							</table>
+         </td>
+        </tr>
+								<tr><td>&nbsp;</td></tr>
+							</table>
+							<CF_SSI VIRTUAL="/ssi/apps/groupbox/endgroupbox.txt">
+							</form>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<cfif isDefined("url.Hub_Filter") AND #url.Hub_Filter# neq "">
+		<tr>
+			<td>
+				<table cellpadding="0" cellspacing="0" border="0" align="center">
+					<tr>
+						<td>
+							<script language="JavaScript">
+							<!--
+							StartGroupBox("Van List","ALIGN: CENTER", "WIDTH: 500");
+							// -->
+							</script>
+							<table cellpadding="0" cellspacing="0" border="0" width="100%">
+								<tr><td>&nbsp;</td></tr>
+								<tr>
+      				<cfoutput>
+       				<cfloop index="outer" from="1" to="#FilteredVanQuery.RecordCount#" step="5">
+         <td align="center">
+      				<table cellpadding="1" cellspacing="1" border="0" align="center" class="separatedSM">
+       				 <cfset RecCnt = 0>
+       				 <cfif #outer# + 4 lt #FilteredVanQuery.RecordCount#>
+        				 <cfset RecCnt = #outer# + 4>
+        				<cfelse>
+        				 <cfset RecCnt = #FilteredVanQuery.RecordCount#>
+            </cfif>
+       				 <cfloop index="inner" from="#outer#" to="#RecCnt#">
+           <tr>
+            <td style="border-right-style: none; border-left-style: none;">
+             <cfif #FilteredVanQuery.InUse[inner]# eq "N">
+              <img border="0" width="15" height="15" src="../images/bulb_green_on.gif">
+             <cfelse>
+              <cfif #FilteredVanQuery.InUse[inner]# eq "Y">
+               <img border="0" width="15" height="15" src="../images/bulb_orange_on.gif">
+              <cfelse>
+               <img border="0" width="15" height="15" src="../images/bulb_red_on.gif">
+              </cfif>
+             </cfif>
+            </td>
+            <td style="border-right-style: none; border-left-style: none;">#FilteredVanQuery.VanNbr[inner]#</td>
+   								</tr>
+   								 </cfloop>
+   							</table>
+         </td>
+   							 </cfloop>
+  								</cfoutput>
+        </tr>
+								<tr><td>&nbsp;</td></tr>
+							</table>
+							<CF_SSI VIRTUAL="/ssi/apps/groupbox/endgroupbox.txt">
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		</cfif>
+		<tr><td>&nbsp;</td></tr>
+		<tr>
+			<td align="center">
+				<cfif isDefined("url.Hub_Filter") AND #url.Hub_Filter# neq "">
+
+					<script language="JavaScript">
+					<!--
+					<cfoutput>
+					StartGroupBox("MPV's - #url.Hub_Filter#","ALIGN: CENTER", "WIDTH: 900");
+					</cfoutput>
+					// -->
+					</script>
+    			</cfif>
+				<cfif isDefined("url.Hub_Filter") AND #url.Hub_Filter# neq "">
+					<table cellpadding="0" cellspacing="0" border="0" class="separatedSM" width="890" valign="top">
+						<tr class="HeaderRow" valign="top">
+							<td align="center" colspan="2">Desk ID</td>
+							<td align="center">Train Symbol</td>
+							<cfoutput>
+       						<td align="center">Van Nbr <br />
+ 				<a href="./RVT_Main.cfm?Hub_Filter=#Hub_Filter#&sortVanBy=asc"><img border="no" src="../images/uparrow.gif"></a>
+				&nbsp;
+				<a href="./RVT_Main.cfm?Hub_Filter=#Hub_Filter#&sortVanBy=desc"><img border="no" src="../images/downarrow.gif"></a>
+							</td>
+							</cfoutput>
+       						<td align="center">Segs</td>
+							<td align="center">Dest Loc</td>
+							<cfoutput>
+							<td align="center">Order Time <br />
+				<a href="./RVT_Main.cfm?Hub_Filter=#url.Hub_Filter#&sortOrderBy=asc"><img border="no" src="../images/uparrow.gif"></a>
+				&nbsp;
+				<a href="./RVT_Main.cfm?Hub_Filter=#url.Hub_Filter#&sortOrderBy=desc"><img border="no" src="../images/downarrow.gif"></a>
+							</td>
+							</cfoutput>
+							<td align="center">Time Needed</td>
+							<td align="center">Arrive PU</td>
+							<td align="center">Actual PU</td>
+							<td align="center">Arrive Dest</td>
+							<td align="center">Ret to Hub</td>
+						</tr>
+					<cfset nextRow = 1>
+					<cfset mainRow = 1>
+					<cfoutput query="FilteredQuery">
+ 					<cfif CurrentRow eq int(#nextRow#)>
+					  	<cfset nextRow = nextRow + int(#Segment#)>
+					  	<cfif (mainRow MOD 2) eq 0>
+						  	<tr class="RowOne" valign="top">
+					  	<cfelse>
+						  <tr class="RowTwo" valign="top">
+					  	</cfif>
+							<td class="TopRow" style="vertical-align: center"><a href="javascript: void EditRecord('#RVT_ID#','#VanNbr#', '#OrderDate#', '#OrderTime#')"><img border="0" name="#RVT_ID#editimage" src="../images/edit.gif"></a></td>
+							<td class="TopRow" valign="center">#DeskID#&nbsp;
+							<cfif #Segment# gt 1>
+								<cfset i = #CurrentRow#>
+								<a href="javascript: void showhide('#CurrentRow#','#i+1#','#nextRow-1#')"><img border="0" name="row#CurrentRow#image" src="../images/twistie_closed.gif"></a>
+							</cfif>
+							</td>
+							<td class="TopRow" align="center" valign="center">#trn_symb# #trn_day#</td>
+ 							<td class="TopRow" align="center" valign="center">#VanNbr#&nbsp;</td>
+ 							<td class="TopRow" align="center" valign="center">#Segment#&nbsp;</td>
+							<td class="TopRow" valign="center">#DestLocation#&nbsp;</td>
+							<td class="TopRow" align="center" valign="center">#OrderDate#&nbsp;#OrderTime#&nbsp;</td>
+							<td class="TopRow" align="center" valign="center">#TimeNeeded#&nbsp;</td>
+							<td class="TopRow" align="center" valign="center">#ArrivalAtPU#&nbsp;</td>
+							<td class="TopRow" align="center" valign="center">#ActualPUTime#&nbsp;</td>
+							<td class="TopRow" align="center" valign="center">#ArrivalAtDestTime#&nbsp;</td>
+							<td class="TopRow" align="center" valign="center">#ReturnToHubTime#&nbsp;</td>
+							</tr>
+							<cfset mainRow = mainRow + 1>
+					<cfelse>
+
+
+
+ 										<cfset indx = #CurrentRow#>
+										<cfset upIndx = #indx# + #Segment# - 2>
+					  		<cfif ((mainRow - 1) MOD 2) eq 0>
+ 									<tr id="row#CurrentRow#" class="RowOne" valign="top" style="display: none">
+								<cfelse>
+ 									<tr id="row#CurrentRow#" class="RowTwo" valign="top" style="display: none">
+								</cfif>
+  									<td class="TopRow" colspan="2">&nbsp;</td>
+													<td class="TopRow" align="center">#FilteredQuery.Trn_Symb# #FilteredQuery.Trn_Day#</td>
+													<td class-"TopRow">&nbsp;</td>
+													<td class="TopRow" align="center">#FilteredQuery.Segment#&nbsp;</td>
+ 													<td class="TopRow">#FilteredQuery.DestLocation#&nbsp;</td>
+													<td class="TopRow" align="center">#FilteredQuery.OrderDate#&nbsp#FilteredQuery.OrderTime#&nbsp;</td>
+													<td class="TopRow" align="center">#FilteredQuery.TimeNeeded#&nbsp;</td>
+													<td class="TopRow" align="center">#FilteredQuery.ArrivalAtPU#&nbsp;</td>
+													<td class="TopRow" align="center">#FilteredQuery.ActualPUTime#&nbsp;</td>
+													<td class="TopRow" align="center">#FilteredQuery.ArrivalAtDestTime#&nbsp;</td>
+													<td class="TopRow" align="center">#FilteredQuery.ReturnToHubTime#&nbsp;</td>
+											</tr>
+  					  </cfif>
+					</cfoutput>
+					</table>
+					<CF_SSI VIRTUAL="/ssi/apps/groupbox/endgroupbox.txt">
+				<cfelse>
+					&nbsp;
+				</cfif>
+			</td>
+		</tr>
+	</table>
+
+	<CF_SSI VIRTUAL="/ssi/apps/pleasewait/inlinePleaseWaitEnd.txt">
+	<CF_SSI VIRTUAL="/ssi/apps/footer.txt">
+<cfoutput>
+<cfif isDefined("url.Hub_Filter") AND #url.Hub_Filter# neq "">
+<a href="./RVT_New.cfm?Hub_Filter=#url.Hub_Filter#">.</a>
+</cfif>
+</cfoutput>
+</body>
+</html>

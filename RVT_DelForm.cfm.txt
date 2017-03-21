@@ -1,0 +1,87 @@
+<cfset hub_filter = #url.Hub_Filter#>
+<html>
+ <head>
+  <title> Delete Van Segment </title>
+ 	<CF_SSI virtual="/ssi/apps/headwhite.txt">
+ 	<CF_SSI virtual="/ssi/apps/groupbox/groupbox.txt">
+ 	<CF_SSI VIRTUAL="/ssi/apps/required/required.txt">
+ 	<CF_SSI VIRTUAL="/ssi/apps/tooltip/tooltip.txt">
+ 	<CF_SSI VIRTUAL="/ssi/apps/calendar/calendar.txt">
+ 	<CF_SSI VIRTUAL="/ssi/apps/time/time.txt">
+ 	<CF_SSI VIRTUAL="/ssi/apps/pleasewait/inlinePleaseWait.txt">
+ <script language="javascript">
+			<!--
+				function DeleteRecord(){
+				for (var i=0;i<document.main.reason.length;i++){
+					if (document.main.reason[i].checked) {
+						document.main.DelReason.value = document.main.reason[i].value;
+					}
+				}
+				if (document.main.DelReason.value == ""){
+					alert('Please select a value from the list');
+				}else{
+					document.main.action = "./RVT_NewProc.cfm";
+	    			document.main.AddEdit.value = "delete";
+					document.main.submit();
+				}
+				}
+			//-->
+		</script>
+ </head>
+ <body>
+	<cfmodule template="./RVT_menubar.cfm">
+	<CF_SSI VIRTUAL="/ssi/apps/pleasewait/inlinePleaseWaitStart.txt">
+	<table cellpadding="0" cellspacing="0" border="0" align="center">
+	<tr>
+		<td>
+  			<cfoutput>
+			<form action="" method="_URL_" name="main" onSubmit="return checkValidateFields('PleaseWait');">
+	        <input type="hidden" name="RVT_ID" value="#url.RVT_ID#" >
+	        <input type="hidden" name="Segment" value="#url.Segment#">
+	        <input type="hidden" name="MaxSegment" value="#url.MaxSegment#">
+	        <input type="hidden" name="AddEdit" value="">
+	        <input type="hidden" name="VanNbr" value="#url.VanNbr#">
+	        <input type="hidden" name="OrderDate" value="#url.OrderDate#">
+	        <input type="hidden" name="OrderTime" value="#url.OrderTime#">
+			<input type="hidden" name="DelReason" value="">
+			<input type="hidden" name="Hub_Filter" value="#url.Hub_Filter#">
+		<table cellpadding="0" cellspacing="0" border="0" align="center">
+		<tr>
+			<script language="JavaScript">
+					<!--
+					StartGroupBox("Delete Segment for Van - #url.VanNbr#","ALIGN: CENTER");
+					// -->
+			</script>
+		</tr>
+		<tr><td>Select reason for segment deletion:</td></tr>
+		<tr>
+			<td>
+			<input type="radio" name="reason" value="1"> Duplicate Order
+			<br>
+			<input type="radio" name="reason" value="2"> Combined with Other Trip
+			<br>
+			<input type="radio" name="reason" value="3"> UP Dispatch Error - Van Dispatched
+			<br>
+			<input type="radio" name="reason" value="4"> UP Dispatch Error - Van Not Dispatched
+			</td>
+		</tr>
+		<tr>
+		    <td align="center"><input type="button" onclick="DeleteRecord();" value=" Delete Segment "></td>
+		</tr>
+<!--- 		<tr>
+
+            <td align="center"><input type="button" onclick="DeleteRecord(document.main.RVT_ID.value, document.main.Hub_Filter.value);" value=" Yes "></td>
+     							<td width="1%">&nbsp;</td>
+            <td align="center"><input type="button" onclick="history.go(-1);" value=" No  "></td>
+     							<td width="10%">&nbsp;</td>
+     							<td width="30%">&nbsp;</td>
+           </tr>
+ --->          </table>
+         </td>
+        </tr>
+		</form>
+		</table>
+			<CF_SSI VIRTUAL="/ssi/apps/groupbox/endgroupbox.txt">
+  </cfoutput>
+ </body>
+</html>

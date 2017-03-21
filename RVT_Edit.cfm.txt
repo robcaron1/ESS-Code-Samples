@@ -1,0 +1,933 @@
+<!--- Variables --->
+<cfset CurrentDate = DateFormat(Now(), "mm/dd/yyyy")>
+<cfset CurrentTime = TimeFormat(Now(), "HH:mm")>
+<cfset CurrentUser = UCase(cgi.Remote_User)>
+
+<cfquery name="DataSource" datasource="CMS_RVT">
+	dbo.usp_RVT_MAIN_DATA_SOURCE
+</cfquery>
+
+<cfquery name="Source" dbtype="query">
+ SELECT DISTINCT
+		RVT_ID,
+		Segment,
+		VanMgtArea,
+  		HubState,
+		Dispatcher,
+		UserID,
+		DeskID,
+		ShiftStartDate,
+		ShiftStartTime,
+		ShiftEndDate,
+		ShiftEndTime,
+		ControlNbr,
+		OrderDate,
+		OrderTime,
+		TimeNeeded,
+		DateNeeded,
+  		DispatchDate,
+		DispatchTime,
+  		ActualPUDate,
+		ActualPUTime,
+		ArrivalAtPU,
+		ArrivalAtPUDate,
+  		ArrivalAtDestDate,
+		ArrivalAtDestTime,
+		DeptDest,
+		PULocation,
+		DestLocation,
+		PULocationOther,
+		DestLocationOther,
+		VanType,
+		VanNbr,
+		VanID,
+  		ReturnToHubTime,
+		ReturnToHubDate,
+		Driver,
+		TrainID,
+		CrewInfo,
+		Trn_Symb,
+    	Trn_Day,
+		Trn_Symb2,
+    	Trn_Day2,
+		Trn_Symb3,
+    	Trn_Day3,
+		LocoNbr,
+		Comments,
+		LastUpdatedBy,
+		LastUpdatedDate,
+  		LastUpdatedTime,
+  		Closed,
+  		Deleted
+ FROM
+  DataSource
+ WHERE
+<cfif isDefined("Segment") and #Segment# neq '' and #Segment# neq 'New' and isDefined("VanNbr") and #VanNbr# neq ''>
+  VanNbr = '#VanNbr#' AND Segment = #Segment# AND OrderDate = '#url.OrderDate#' AND OrderTime = '#OrderTime#'
+<cfelse>
+  RVT_ID = #RVT_ID#
+</cfif>
+</cfquery>
+
+<cfquery name="VanSource" datasource="CMS_RVT">
+	dbo.usp_RVT_Van_Info
+</cfquery>
+
+<cfquery name="VanInfo" dbtype="query">
+ SELECT DISTINCT
+  *
+ FROM
+  VanSource
+WHERE
+ <!---  (InUse = 'N' and VanHub = '#url.Hub_Filter#') or VanNbr = '#url.VanNbr#' --->
+   (VanHub = '#url.Hub_Filter#') or VanNbr = '#url.VanNbr#'
+ ORDER BY
+  SeqNbr
+</cfquery>
+
+<cfquery name="getRvtID" dbtype="query">
+SELECT RVT_ID FROM DataSource
+WHERE
+ 1=1
+<cfif isDefined("Segment") and #Segment# neq '' and #Segment# neq 'New' and isDefined("VanNbr") and #VanNbr# neq ''>
+  AND VanNbr = '#VanNbr#' AND Segment = #Segment#
+</cfif>
+</cfquery>
+
+<cfquery name="MaxSegment" dbtype="query">
+SELECT Max(Segment) AS MaxSeg FROM DataSource
+WHERE
+  VanNbr = '#url.VanNbr#' And OrderDate = '#url.OrderDate#' And OrderTime = '#url.OrderTime#'
+</cfquery>
+
+<cfquery name="LocationInfo" datasource="CMS_RVT">
+ EXEC dbo.usp_RVT_Hub_Loc_Info
+  @HUB_FILTER = '#url.Hub_Filter#'
+</cfquery>
+
+<cfquery name="ChkClose" dbtype="query">
+	Select Segment AS CloseSeg, ActualPUTime, ArrivalAtPU, ArrivalAtDestTime
+	From DataSource 
+	Where 
+	VanNbr = '#url.VanNbr#' AND
+		Deleted IS NULL AND
+		(ActualPUTime LIKE  ''OR
+		ArrivalAtPU LIKE  ''OR
+		ArrivalAtDestTime LIKE '')
+	ORDER BY Segment DESC
+</cfquery>
+
+<!--- <cfquery name="TrainInfo" datasource="CMS_RVT">
+ EXEC dbo.usp_RVT_MAIN_TRAIN_SOURCE
+</cfquery>
+ --->
+<html>
+<head>
+	<title>MPV Tracking System</title>
+	<CF_SSI virtual="/ssi/apps/headwhite.txt">
+	<CF_SSI virtual="/ssi/apps/groupbox/groupbox.txt">
+	<CF_SSI VIRTUAL="/ssi/apps/required/required.txt">
+	<CF_SSI VIRTUAL="/ssi/apps/tooltip/tooltip.txt">
+	<CF_SSI VIRTUAL="/ssi/apps/calendar/calendar.txt">
+	<CF_SSI VIRTUAL="/ssi/apps/time/time.txt">
+	<CF_SSI VIRTUAL="/ssi/apps/pleasewait/inlinePleaseWait.txt">
+ <script language="javascript">
+		<!--
+//			function searchSel() {
+//			var input=document.getElementById('TrSymSrc').value.toUpperCase();
+//  			var output=document.getElementById('TrSymLst').options;
+//  			for(var i=0;i<output.length;i++) {
+//    			if(output[i].value.indexOf(input)==0){
+//      				output[i].selected=true;
+//      			}
+//    			if(document.main.TrSymSrc.value==''){
+//      				output[0].selected=true;
+//      			}
+//  			}
+//			if (document.main.Trn_Symb_Src.value.toUpperCase() == document.main.Trn_Symb_List.value){
+//				document.main.Trn_Symb_Src.value = document.main.Trn_Symb_List.value;
+//				document.main.TrnSymbOK.value = "Y";
+//			}else{
+//				alert ('Invalid Train Symbol 1 Entered.\nPlease ensure that there is a space between the Train Symbol and Day');
+//				document.main.Trn_Symb_Src.focus();
+//				document.main.TrnSymbOK.value = "N";
+//				document.main.Trn_Symb_Src.value="";
+//			}
+//			}
+
+//			function searchSel2() {
+//				if (document.main.Trn_Symb_Src2.value == ' '){
+//					document.main.Trn_Symb_Src2.value = '';
+//				}else if (document.main.Trn_Symb_Src2.value != '' && document.main.Trn_Symb_Src.value == ''){
+//					alert ('Train Symbol 1 needs to have a value entered');
+//					document.main.Trn_Symb_Src.focus();
+//					document.main.Trn_Symb_Src2.value="";
+//				}else{
+//					var input=document.getElementById('TrSymSrc2').value.toUpperCase();
+//  					var output=document.getElementById('TrSymLst').options;
+//  					for(var i=0;i<output.length;i++) {
+//    					if(output[i].value.indexOf(input)==0){
+//      						output[i].selected=true;
+//      					}
+//    					if(document.main.TrSymSrc2.value==''){
+//      						output[0].selected=true;
+//      					}
+//  					}
+				
+//					if (document.main.Trn_Symb_Src2.value.toUpperCase() == document.main.Trn_Symb_List.value){
+//						document.main.Trn_Symb_Src2.value = document.main.Trn_Symb_List.value;
+//						document.main.TrnSymbOK.value = "Y";
+//					}else{
+//						alert ('Invalid Train Symbol 2 Entered.\nPlease ensure that there is a single space between the Train Symbol and Two Digit Train Day.\n Ex. CATWS 27');
+//						document.main.Trn_Symb_Src2.focus();
+//						document.main.TrnSymbOK.value = "N";
+//Keep commented						document.main.Trn_Symb_Src2.value="";
+//					}
+//				}
+//			}
+
+//			function searchSel3() {
+//				if (document.main.Trn_Symb_Src3.value == ' '){
+//					document.main.Trn_Symb_Src3.value = '';
+//				} else if (document.main.Trn_Symb_Src3.value != '' && document.main.Trn_Symb_Src2.value == ''){
+//					alert ('Train Symbol 2 needs to have a value entered');
+//					document.main.Trn_Symb_Src2.focus();
+//					document.main.Trn_Symb_Src3.value="";
+//				}else{
+//					var input=document.getElementById('TrSymSrc3').value.toUpperCase();
+// 					var output=document.getElementById('TrSymLst').options;
+//  					for(var i=0;i<output.length;i++) {
+//    					if(output[i].value.indexOf(input)==0){
+//      						output[i].selected=true;
+//      					}
+//    					if(document.main.TrSymSrc3.value==''){
+//      						output[0].selected=true;
+//      					}
+//  					}
+//					if (document.main.Trn_Symb_Src3.value.toUpperCase() == document.main.Trn_Symb_List.value){
+//						document.main.Trn_Symb_Src3.value = document.main.Trn_Symb_List.value;
+//						document.main.TrnSymbOK.value = "Y";
+//					}else{
+//						alert ('Invalid Train Symbol 3 Entered.\nPlease ensure that there is a space between the Train Symbol and Day');
+//						document.main.Trn_Symb_Src3.focus();
+//						document.main.TrnSymbOK.value = "N";
+////						document.main.Trn_Symb_Src3.value="";
+//					}
+//				}
+//			}
+
+			function chkDateNeeded(dDate) {
+
+					DateFieldCheck(document.main.DateNeeded,'format: 1');
+					if (document.main.DateNeeded.value == ''){
+						nDate = new Date();
+						newDate = (nDate.getMonth()+1) + '/' + nDate.getDate() + '/' + (nDate.getFullYear());
+						document.main.DateNeeded.value = newDate;
+					DateFieldCheck(document.main.DateNeeded,'format: 1');
+					}	
+						chDate = new Date(document.main.DateNeeded.value);
+						if (isNaN(chDate.getMonth()+1)){
+							document.main.DateNeeded.value = '';
+							document.main.DateNeeded.focus();
+						}else{						
+							newDate = (chDate.getMonth()+1) + '/' + chDate.getDate() + '/' + (chDate.getFullYear());
+//						document.main.DispatchDate.value = newDate;
+//						document.main.ArrAtPUDate.value = newDate;
+//						document.main.ActualPUDate.value = newDate;
+//						document.main.ArrivalAtDestDate.value = newDate;
+//						document.main.ReturnToHubDate.value = newDate;
+//						DateFieldCheck(document.main.DispatchDate,'format: 1');
+//						DateFieldCheck(document.main.ArrAtPUDate,'format: 1');
+//						DateFieldCheck(document.main.ActualPUDate,'format: 1');
+//						DateFieldCheck(document.main.ArrivalAtDestDate,'format: 1');
+//						DateFieldCheck(document.main.ReturnToHubDate,'format: 1');
+						}
+					
+			}
+
+			function trim(stringToTrim) {
+				return stringToTrim.replace(/^\s+|\s+$/g,"");
+			}
+
+			function ltrim(stringToTrim) {
+				return stringToTrim.replace(/^\s+/,"");
+			}
+
+			function rtrim(stringToTrim) {
+				return stringToTrim.replace(/\s+$/,"");
+			}
+
+			function chkDispatch(dTime, aTime) {
+				if (aTime != ""){
+					timeFormatVerify(document.main.DispatchTime,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');
+					daTime = document.main.DateNeeded.value + ' ' + dTime;
+					var disTime = new Date(daTime);
+					arTime = document.main.DateNeeded.value + ' ' + document.main.DispatchTime.value;
+					var arrTime = new Date(arTime);
+					cTime = (disTime.getTime() - arrTime.getTime())/60000;
+					if (cTime > -1440 && cTime <=-1080){
+						chDate = new Date(document.main.DateNeeded.value);
+						chDate.setDate(chDate.getDate()-1);
+						newDate = (chDate.getMonth()+1) + '/' + chDate.getDate() + '/' + (chDate.getFullYear());
+						document.main.DispatchDate.value = newDate;
+						DateFieldCheck(document.main.DispatchDate,'format: 1');
+					}else{
+						document.main.DispatchDate.value = document.main.DateNeeded.value;
+					}						
+				}
+			}
+
+			function chkArrAtPU(dTime, aTime) {
+				if (aTime != ""){
+					timeFormatVerify(document.main.ArrivalAtPU,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');
+					daTime = document.main.DispatchDate.value + ' ' + dTime;
+					var disTime = new Date(daTime);
+					arTime = document.main.DispatchDate.value + ' ' + document.main.ArrivalAtPU.value;
+					var arrTime = new Date(arTime);
+					cTime = (arrTime.getTime() - disTime.getTime())/60000;
+					if (cTime <= 0 && cTime > -1200){
+						document.main.ArrivalAtPU.focus();
+						alert('Invalid time entered. Time needs to be after Dispatch time.');
+						document.main.ArrivalAtPU.value="";
+					}
+					if (cTime > 240){
+						document.main.ArrivalAtPU.focus();
+						alert('Invalid time entered. Time needs 4 hours or less after Dispatch time.');
+						document.main.ArrivalAtPU.value="";
+					}
+					if (cTime <= -1200){
+						chDate = new Date(document.main.DispatchDate.value);
+						chDate.setDate(chDate.getDate()+1);
+						newDate = (chDate.getMonth()+1) + '/' + chDate.getDate() + '/' + (chDate.getFullYear());
+						document.main.ArrAtPUDate.value = newDate;
+						DateFieldCheck(document.main.ArrAtPUDate,'format: 1');
+					}
+					if (cTime > 0 && cTime <= 240){
+						document.main.ArrAtPUDate.value = document.main.DispatchDate.value;
+					}
+				}
+			}
+
+			function chkActualPU(dTime, aTime) {
+				if (aTime != ""){
+					timeFormatVerify(document.main.ActualPUTime,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');
+					daTime = document.main.ArrAtPUDate.value + ' ' + dTime;
+					var disTime = new Date(daTime);
+					arTime = document.main.ArrAtPUDate.value + ' ' + document.main.ActualPUTime.value;
+					var arrTime = new Date(arTime);
+					cTime = (arrTime.getTime() - disTime.getTime())/60000;
+					if (cTime < 0 && cTime > -1200){
+						document.main.ActualPUTime.focus();
+						alert('Invalid time entered. Time needs to be after or equal to Arrival at Pickup time.');
+						document.main.ActualPUTime.value="";
+					}
+					if (cTime > 240){
+						document.main.ActualPUTime.focus();
+						alert('Invalid time entered. Time needs 4 hours or less after Arrival at Pickup time.');
+						document.main.ActualPUTime.value="";
+					}						
+//					if (cTime >= 1440 && cTime <= 1680){
+//						chDate = new Date(document.main.ActualPUDate.value);
+//						chDate.setDate(chDate.getDate()-1);
+//						newDate = (chDate.getMonth()+1) + '/' + chDate.getDate() + '/' + (chDate.getFullYear());
+//						document.main.ActualPUDate.value = newDate;
+//						DateFieldCheck(document.main.ActualPUDate,'format: 1');
+//					}							
+					if (cTime <= -1200){
+						chDate = new Date(document.main.ArrAtPUDate.value);
+						chDate.setDate(chDate.getDate()+1);
+						newDate = (chDate.getMonth()+1) + '/' + chDate.getDate() + '/' + (chDate.getFullYear());
+						document.main.ActualPUDate.value = newDate;
+//						document.main.ArrivalAtDestDate.value = newDate;
+//						document.main.ReturnToHubDate.value = newDate;
+						DateFieldCheck(document.main.ActualPUDate,'format: 1');
+//						DateFieldCheck(document.main.ArrivalAtDestDate,'format: 1');
+//						DateFieldCheck(document.main.ReturnToHubDate,'format: 1');
+					}						
+					if (cTime >= 0 && cTime <= 240){
+						document.main.ActualPUDate.value = document.main.ArrAtPUDate.value;
+					}
+				}
+			}
+
+			function chkArrDest(dTime, aTime) {
+				if (aTime != ""){
+					timeFormatVerify(document.main.ArrivalAtDestTime,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');
+					daTime = document.main.ActualPUDate.value + ' ' + dTime;
+					var disTime = new Date(daTime);
+					arTime = document.main.ActualPUDate.value + ' ' + document.main.ArrivalAtDestTime.value;
+					var arrTime = new Date(arTime);
+					cTime = (arrTime.getTime() - disTime.getTime())/60000;
+					if (cTime <= 0 && cTime > -1200){
+						document.main.ArrivalAtDestTime.focus();
+						alert('Invalid time entered. Time needs to be after Actual Pickup time.');
+						document.main.ArrivalAtDestTime.value="";
+					}
+					if (cTime > 240){
+						document.main.ArrivalAtDestTime.focus();
+						alert('Invalid time entered. Time needs 4 hours or less after Actual Pickup time.');
+						document.main.ArrivalAtDestTime.value="";
+					}						
+//					if (cTime >= 1440 && cTime <= 1680){
+//						chDate = new Date(document.main.ArrivalAtDestDate.value);
+//						chDate.setDate(chDate.getDate()-1);
+//						newDate = (chDate.getMonth()+1) + '/' + chDate.getDate() + '/' + (chDate.getFullYear());
+//						document.main.ArrivalAtDestDate.value = newDate;
+//						DateFieldCheck(document.main.ArrivalAtDestDate,'format: 1');
+//					}							
+					if (cTime <= -1200){
+						chDate = new Date(document.main.ActualPUDate.value);
+						chDate.setDate(chDate.getDate()+1);
+						newDate = (chDate.getMonth()+1) + '/' + chDate.getDate() + '/' + (chDate.getFullYear());
+						document.main.ArrivalAtDestDate.value = newDate;
+//						document.main.ReturnToHubDate.value = newDate;
+						DateFieldCheck(document.main.ArrivalAtDestDate,'format: 1');
+//						DateFieldCheck(document.main.ReturnToHubDate,'format: 1');
+					}						
+					if (cTime > 0 && cTime <= 240){
+						document.main.ArrivalAtDestDate.value = document.main.ActualPUDate.value;
+					}
+				}
+			}
+
+			function chkRetHub(dTime, aTime) {
+				if (aTime != ""){
+					timeFormatVerify(document.main.ReturnToHubTime,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');
+					daTime = document.main.ArrivalAtDestDate.value + ' ' + dTime;
+					var disTime = new Date(daTime);
+					arTime = document.main.ArrivalAtDestDate.value + ' ' + document.main.ReturnToHubTime.value;
+					var arrTime = new Date(arTime);
+					cTime = (arrTime.getTime() - disTime.getTime())/60000;
+					if (cTime < 0 && cTime > -1200){
+						document.main.ReturnToHubTime.focus();
+						alert('Invalid time entered. Time needs to be after Arrival at Dest time.');
+						document.main.ReturnToHubTime.value="";
+					}
+					if (cTime > 360){
+						alert('Time entered is over 6 hours after Arrival at Dest time.');
+						document.main.ReturnToHubDate.value = document.main.ArrivalAtDestDate.value;
+					}						
+//					if (cTime >= 1440 && cTime <= 1680){
+//						chDate = new Date(document.main.ReturnToHubDate.value);
+//						chDate.setDate(chDate.getDate()-1);
+//						newDate = (chDate.getMonth()+1) + '/' + chDate.getDate() + '/' + (chDate.getFullYear());
+//						document.main.ReturnToHubDate.value = newDate;
+//						DateFieldCheck(document.main.ReturnToHubDate,'format: 1');
+//					}							
+					if (cTime <= -1200){
+						chDate = new Date(document.main.ArrivalAtDestDate.value);
+						chDate.setDate(chDate.getDate()+1);
+						newDate = (chDate.getMonth()+1) + '/' + chDate.getDate() + '/' + (chDate.getFullYear());
+						document.main.ReturnToHubDate.value = newDate;
+						DateFieldCheck(document.main.ReturnToHubDate,'format: 1');
+					}						
+					if (cTime > 0 && cTime <= 240){
+						document.main.ReturnToHubDate.value = document.main.ArrivalAtDestDate.value;
+					}
+				}
+			}
+			
+			function AddRecord(){
+    //alert('Not Active Yet');
+				inlinePleaseWaitSubmit(main,1);
+				document.main.action = "./RVT_NewProc.cfm";
+				document.main.submit();
+			}
+   
+			function EditRecord(){
+    			//alert('Not Active Yet');
+        		var trnsymb = trim(document.main.Trn_Symb_Src.value)
+        		var trnsymb2 = trim(document.main.Trn_Symb_Src2.value)
+        		var trnsymb3 = trim(document.main.Trn_Symb_Src3.value)
+				if (trnsymb.length == 0){
+		  			alert('Must select a Train Symbol');
+		  		}
+				else if (document.main.TimeNeeded.value.length != 5 || document.main.DateNeeded.value.length != 10 || document.main.TimeNeeded.value.substring(0,4) == 'ASAP' || document.main.TimeNeeded.value.substring(1,4) == 'ASAP'){
+				  alert('Must enter a valid Time and Date Needed\nASAP is no longer a valid time');		
+				}else {
+
+    				validateRequiredField(document.main.ReturnToHubTime, "Time", "style: 24");
+					inlinePleaseWaitSubmit(main,1);
+        			document.main.Trn_Day1.value = trnsymb.substring(trnsymb.length - 2);
+        			document.main.Trn_Symb1.value = trnsymb.substring(0,trnsymb.length - 3);
+        			document.main.Trn_Day2.value = trnsymb2.substring(trnsymb2.length - 2);
+        			document.main.Trn_Symb2.value = trnsymb2.substring(0,trnsymb2.length - 3);
+        			document.main.Trn_Day3.value = trnsymb3.substring(trnsymb3.length - 2);
+	       			document.main.Trn_Symb3.value = trnsymb3.substring(0,trnsymb3.length - 3);
+						if (document.main.AddEdit.value == ""){
+        					document.main.AddEdit.value = "edit";
+						}
+					document.main.action = "./RVT_NewProc.cfm";
+					document.main.submit();
+				}
+			}
+   
+			function RefreshScreen(){
+				if (document.main.Segment.value == 'New'){
+					document.main.AddEdit.value = "add";
+			  		document.main.Segment.options[document.main.Segment.length - 1].text = document.main.Segment.length;
+			  		document.main.Segment.options[document.main.Segment.length - 1].value = document.main.Segment.length;
+			  		document.main.ArrivalAtPU.value = "";
+					document.main.ArrAtPUDate.value = "";
+			  		document.main.ControlNbr.value = "";
+			  		document.main.TimeNeeded.value = "";
+			  		document.main.DateNeeded.value = "";
+			  		document.main.PULocation.value = "";
+			  		document.main.ArrivalAtPU.value = "";
+			  		document.main.PULocationOther.value = "";
+			  		document.main.DispatchTime.value = "";
+			  		document.main.DispatchDate.value = "";
+			  		document.main.DestLocation.value = "";
+			  		document.main.DestLocationOther.value = "";
+			  		document.main.ActualPUTime.value = "";
+			  		document.main.ActualPUDate.value = "";
+			  		document.main.ArrivalAtDestTime.value = "";
+			  		document.main.ArrivalAtDestDate.value = "";
+			  		document.main.Trn_Symb_Src.value = "";
+			  		document.main.Trn_Symb_Src2.value = "";
+			  		document.main.Trn_Symb_Src3.value = "";
+			  		document.main.ReturnToHubTime.value = "";
+			  		document.main.ReturnToHubDate.value = "";
+			  		document.main.CrewInfo.value = "";
+			  		document.main.comments.value = "";
+//			  		document.main.VanNbr.disabled = "true";
+			  	}else{
+					document.main.action = "./RVT_Edit.cfm";
+					document.main.submit();
+				}
+			}
+   
+			function CloseRecord(aadt,aapu,aput,rtht){
+//				searchSel();
+//				if (document.main.TrnSymbOK.value == 'Y'){
+//					searchSel2();
+//				}
+//				if (document.main.TrnSymbOK.value == 'Y'){
+//					searchSel3();
+//				}
+//				if (document.main.TrnSymbOK.value == 'Y'){
+    				if (aadt == '') {
+     					alert('Arrival at Dest Time, Arr at Pickup, Actual Pickup Time and Return to Hub Time must be filled in to Close Record.\n\tReturn to Hub Time can only be accessed from the last segment');
+    				}
+    				else if (aapu == '') {
+     					alert('Arrival at Dest Time, Arr at Pickup, Actual Pickup Time and Return to Hub Time must be filled in to Close Record.\n\tReturn to Hub Time can only be accessed from the last segment');
+    				}
+    				else if (aput == '') {
+     					alert('Arrival at Dest Time, Arr at Pickup, Actual Pickup Time and Return to Hub Time must be filled in to Close Record.\n\tReturn to Hub Time can only be accessed from the last segment');
+    				}
+    				else if (rtht == '') {
+     					alert('Arrival at Dest Time, Arr at Pickup, Actual Pickup Time and Return to Hub Time must be filled in to Close Record.\n\tReturn to Hub Time can only be accessed from the last segment');
+    				}
+					else if (document.main.CloseOK.value == 'N'){
+     					alert('Arrival at Dest Time, Arr at Pickup, Actual Pickup Time must be filled in for ALL segments to Close Record.\n\tReturn to Hub Time can only be accessed from the last segment');
+					}
+					else if (document.main.VanNbr.value == 'OTHER'){
+						alert('A valid Van Number MUST be selected to close this record');
+						document.main.VanNbr.focus();
+					}	
+    				else {
+        				var trnsymb = trim(document.main.Trn_Symb_Src.value);
+		        		var trnsymb2 = trim(document.main.Trn_Symb_Src2.value);
+    		    		var trnsymb3 = trim(document.main.Trn_Symb_Src3.value);
+        				document.main.Trn_Day1.value = trnsymb.substring(trnsymb.length - 2);
+        				document.main.Trn_Symb1.value = trnsymb.substring(0,trnsymb.length - 3);
+        				document.main.Trn_Day2.value = trnsymb2.substring(trnsymb2.length - 2);
+        				document.main.Trn_Symb2.value = trnsymb2.substring(0,trnsymb2.length - 3);
+	        			document.main.Trn_Day3.value = trnsymb3.substring(trnsymb3.length - 2);
+		       			document.main.Trn_Symb3.value = trnsymb3.substring(0,trnsymb3.length - 3);
+						inlinePleaseWaitSubmit(main,1);
+						if (document.main.AddEdit.value == 'add') {
+							document.main.AddEdit.value = "addClose";
+						}else{
+	    					document.main.AddEdit.value = "close";
+	    				}
+						document.main.action = "./RVT_NewProc.cfm";
+						document.main.submit();
+    				}
+//				}
+			}
+
+			function DeleteRecord(rvt_id, hub_filter, seg, maxseg){
+//    alert('Not Active Yet');
+				inlinePleaseWaitSubmit(main,1);
+				document.main.action = "./RVT_DelForm.cfm";
+    document.main.AddEdit.value = "delete";
+				document.main.submit();
+			}
+		//-->
+	</script>
+	<style>
+  td.TopRow {
+   border-top-style: solid;
+   border-top-width: 1px;
+  }
+	</style>
+</head>
+<body onload="document.main.TimeNeeded.focus()">
+	<cfmodule template="./RVT_menubar.cfm">
+	<CF_SSI VIRTUAL="/ssi/apps/pleasewait/inlinePleaseWaitStart.txt">
+ 	<cfoutput query="Source">
+	<table cellpadding="0" cellspacing="0" border="0" align="center">
+	<tr>
+		<td>
+		<table cellpadding="0" cellspacing="0" border="0" align="center">
+		<tr>
+			<td>
+			<form action="" method="_URL_" name="main" onSubmit="return checkValidateFields('PleaseWait');">
+	        <input type="hidden" name="VanMgtArea" value="#VanMgtArea#" >
+	        <input type="hidden" name="HubState" value="#HubState#">
+	        <input type="hidden" name="Hub_Filter" value="#url.Hub_Filter#">
+	        <input type="hidden" name="AddEdit" value="">
+	        <input type="hidden" name="OldVanNbr" value="#VanNbr#">
+	        <input type="hidden" name="OldDriver" value="#Driver#">
+	        <input type="hidden" name="TrainID" value="#TrainID#">
+            <input type="hidden" name="Trn_Day1" value="">
+            <input type="hidden" name="Trn_Symb1" value="">
+           	<input type="hidden" name="Trn_Day2" value="">
+           	<input type="hidden" name="Trn_Symb2" value="">
+           	<input type="hidden" name="Trn_Day3" value="">
+           	<input type="hidden" name="Trn_Symb3" value="">
+			<input type="hidden" name="CurrentUser" value="#CurrentUser#">
+			<input type="hidden" name="RVT_ID" value="#RVT_ID#">
+            <input type="hidden" name="LocoNbr" value="#LocoNbr#">
+            <input type="hidden" name="vNbr" value="#VanNbr#">
+			<input type="hidden" name="TrnSymbOK" value="">
+					</cfoutput>
+					<cfoutput query="Maxsegment">
+ 			<input type="hidden" name="MaxSegment" value="#MaxSeg#">
+					</cfoutput>
+					<cfoutput query="Source">
+<!--- 			<input type="hidden" name="MaxSegment" value="#url.Segment#">
+ --->			<script language="JavaScript">
+				<!--
+				StartGroupBox("Edit Record for Hub - #url.Hub_Filter#","ALIGN: CENTER", "WIDTH: 100%");
+				// -->
+			</script>
+			<table cellpadding="0" cellspacing="0" border="0" width="100%">
+			<tr>
+         		<td align="center" class="TopRow"><b>Dispatch Info</b></td>
+        	</tr>
+			<tr>
+         		<td align="center">
+   				<table cellpadding="5" cellspacing="0" border="0" width="100%">
+    			<tr>
+					<td align="right">Desk ID:</td>
+					<td align="left"><input type="textbox" size="12" maxlength="10" name="DeskID" class="fieldSM" value="#DeskID#" readonly="true"  style="background-color: rgb(192,192,192);"></td>
+            		<td>&nbsp;</td>
+					<td align="right">User ID:</td>
+					<td align="left"><input type="textbox" size="12" maxlength="10" name="UserID" class="fieldSM" value="#UserID#" readonly="true" style="background-color: rgb(192,192,192);"></td>
+					<td align="right">Dispatcher:</td>
+			    	<td align="left" colspan="2"><input type="textbox" size="30" maxlength="30" name="Dispatcher" class="fieldSM" value="#Dispatcher#" readonly="true" style="background-color: rgb(192,192,192);"></td>
+            		<td colspan="3">&nbsp;</td>
+           		</tr>
+<!---     			<tr>
+ ---><!--- 			        <td align="right">Shift Start Date:</td>
+ --->			        <td align="left"><input type="hidden" size="12" maxlength="10" name="ShiftStartDate" onChange="DateFieldCheck(this,'format: 1');" onBlur="DateFieldCheckBlur(this);" class="fieldSM" value="#ShiftStartDate#" readonly="true" style="background-color: rgb(192,192,192);"></td>
+<!--- 		        	<td align="left"><script language="JavaScript">calendarPopup("main.ShiftStartDate","1","format: 1");</script></td>
+ ---><!--- 			        <td align="right">Shift Start Time:</td>
+ --->			        <td align="left"><input type="hidden" size="12" maxlength="10" name="ShiftStartTime" onFocus="timeFormatVerify(this,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onChange="timeFormatVerify(document.main.ShiftStartTime,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" class="fieldSM" value="#ShiftStartTime#" class="fieldSM" value="#ShiftStartTime#" readonly="true" style="background-color: rgb(192,192,192);"></td>
+<!--- 			        <td align="right">Shift End Date:</td>
+ --->			        <td align="left"><input type="hidden" size="12" maxlength="10" name="ShiftEndDate" onChange="DateFieldCheck(this,'format: 1');" onBlur="DateFieldCheckBlur(this);" class="fieldSM" value="#ShiftEndDate#" readonly="true" style="background-color: rgb(192,192,192);"></td>
+<!--- 		          	<td align="left"><script language="JavaScript">calendarPopup("main.ShiftEndDate","1","format: 1");</script></td>
+			        <td align="right">Shift End Time:</td>
+ --->			        <td align="left"><input type="hidden" size="12" maxlength="10" name="ShiftEndTime" onFocus="timeFormatVerify(this,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onChange="timeFormatVerify(document.main.ShiftEndTime,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" class="fieldSM" value="#ShiftEndTime#" class="fieldSM" value="#ShiftEndTime#" readonly="true" style="background-color: rgb(192,192,192);"></td>
+<!---            		</tr>
+ --->          		</table>
+         		</td>
+        	</tr>
+			<tr>
+         		<td align="center" class="TopRow"><b>Order Info</b></td>
+        	</tr>
+			<tr>
+         	<td align="center">
+   			<table cellpadding="5" cellspacing="0" border="0" width="100%">
+    		<tr>
+			    <td align="right">Order Time:</td>
+			    <td align="left"><input type="textbox" size="7" maxlength="10" name="OrderTime" onFocus="timeFormatVerify(this,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onChange="timeFormatVerify(document.main.OrderTime,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" class="fieldSM" value="#OrderTime#" readonly="true" style="background-color: rgb(192,192,192);"></td>
+			    <td align="left"><input type="textbox" size="12" maxlength="10" name="OrderDate" onChange="DateFieldCheck(this,'format: 1');" onBlur="DateFieldCheckBlur(this);" class="fieldSM" value="#OrderDate#" readonly="true" style="background-color: rgb(192,192,192);"></td>
+				<td align="right">Control Nbr:</td>
+			    <td align="left"><input type="textbox" size="25" maxlength="20" name="ControlNbr" class="fieldSM" value="#ControlNbr#"></td>
+			    <td align="right">Segment:</td>
+				<td>
+<!--- 			        <cfif isDefined("MaxSegment")>
+			           <cfset MaxSeg = #MaxSegment#>
+			        <cfelse>
+					   <cfset MaxSeg = '#url.Segment#'>
+					</cfif>
+ --->            		
+					</cfoutput>
+					<cfoutput query="Maxsegment">
+						<cfset MaxSeg = "#MaxSeg#">
+					</cfoutput>
+					<cfoutput query="Source">
+					<cfset CurrentSegment = #Segment#>
+					<select name="Segment" size="1" class="txtsv" onchange="RefreshScreen();">
+						<cfloop INDEX="Seg" FROM="1" TO="#MaxSeg#">
+ 						<cfif isDefined("CurrentSegment") and #CurrentSegment# eq #Seg#>
+							<option value="#Seg#" selected="selected">#Seg#</option>
+						<cfelse>
+							<option value="#Seg#">#Seg#</option>
+            			</cfif>
+<!--- 						<option><cfoutput>#Seg#</cfoutput>
+ --->						</cfloop>
+<!--- 							<option value="#Segment#" selected="selected">#Segment#</option>
+ ---> 						<option value="New">New</option>
+					</select>
+				</td>
+<!--- 			    <td align="left"><input type="textbox" size="2" maxlength="2" name="Segment" class="fieldSM" value="#Segment#">
+ --->			</tr>
+
+			<tr>
+			    <td align="right">Time Needed:</td>
+			    <td align="left"><input type="textbox" size="7" maxlength="10" name="TimeNeeded" onBlur="timeFormatVerify(this,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onChange="timeFormatVerify(document.main.TimeNeeded,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" class="fieldSM" value="#TimeNeeded#" tabindex="1"></td>
+			    <td align="left"><input type="textbox" size="12" maxlength="10" name="DateNeeded" onBlur="chkDateNeeded(this);" class="fieldSM" value="#DateNeeded#" tabindex="2"></td>
+			    <td align="right">Pickup Location:</td>
+            	<td colspan="2">
+            	<cfset CurrentPULoc = #PULocation#>
+				</cfoutput>
+					<select name="PULocation" size="1" class="txtsv" tabindex="4">
+					<option value="" selected="selected"></option>
+            		<cfoutput query="LocationInfo">
+						<cfif isDefined("CurrentPULoc") and #CurrentPULoc# eq #FullLoc#>
+							<option value="#FullLoc#" selected="selected">#FullLoc#</option>
+						<cfelse>
+							<option value="#FullLoc#">#FullLoc#</option>
+            			</cfif>
+            		</cfoutput>
+            		<cfoutput query="Source">
+            		<cfif #PULocationOther# neq "">
+						<option value="Other" selected="selected">Other</option>
+            		<cfelse>
+						<option value="Other">Other</option>
+            		</cfif>
+					</select>
+            	</td>
+            	<td align="left"><input type="textbox" size="12" maxlength="255" name="PULocationOther" value="#PULocationOther#" class="fieldSM"></td>
+<!--- 
+			         <td align="right">Dispatch Time:</td>
+			         <td align="left"><input type="textbox" size="12" maxlength="10" name="DispatchTime" class="fieldSM" 
+
+value="#DispatchTime#"></td>
+			         <td>&nbsp;</td>
+			         <td align="right">Order Time:</td>
+			         <td align="left"><input type="textbox" size="12" maxlength="10" name="OrderTime" class="fieldSM" 
+
+value="#OrderTime#"></td>
+ --->
+           	</tr>
+           	<tr>
+				<td align="right">Dispatch Time:</td>
+			    <td align="left"><input type="textbox" size="7" maxlength="10" name="DispatchTime" onFocus="timeFormatVerify(this,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onChange="timeFormatVerify(document.main.DispatchTime,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onblur="chkDispatch(document.main.TimeNeeded.value, document.main.DispatchTime.value);" class="fieldSM" value="#DispatchTime#" tabindex="3"></td>
+			    <td align="left"><input type="textbox" size="12" maxlength="10" name="DispatchDate" onFocus="DateFieldCheck(this,'format: 1');" onBlur="DateFieldCheckBlur(this);" class="fieldSM" value="#DispatchDate#"></td>
+	         	<td align="right">Dest Location:</td>
+            	<td colspan="2">
+            	<cfset CurrentDestLoc = #DestLocation#>
+				</cfoutput>
+					<select name="DestLocation" size="1" class="txtsv" tabindex="5">
+					<option value="" selected="selected"></option>
+		            <cfoutput query="LocationInfo">
+					<cfif isDefined("CurrentDestLoc") and #CurrentDestLoc# eq #FullLoc#>
+						<option value="#FullLoc#" selected="selected">#FullLoc#</option>
+					<cfelse>
+						<option value="#FullLoc#">#FullLoc#</option>
+        		    </cfif>
+            		</cfoutput>
+            		<cfoutput query="Source">
+            		<cfif #DestLocationOther# neq "">
+						<option value="Other" selected="selected">Other</option>
+            		<cfelse>
+						<option value="Other">Other</option>
+            		</cfif>
+					</select>
+            	</td>
+            	<td align="left"><input type="textbox" size="12" maxlength="255" name="DestLocationOther" value="#DestLocationOther#" class="fieldSM"></td>
+           	</tr>
+			<tr>
+			    <td align="right">Arrival at Pickup*:</td>
+	         	<td align="left"><input type="textbox" size="7" maxlength="10" name="ArrivalAtPU" onFocus="timeFormatVerify(this,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onBlur="chkArrAtPU(document.main.DispatchTime.value, document.main.ArrivalAtPU.value);" class="fieldSM" value="#ArrivalAtPU#"  style="background-color: rgb(255,255,204);" tabindex="6"></td>
+			    <td align="left"><input type="textbox" size="12" maxlength="10" name="ArrAtPUDate" onChange="DateFieldCheck(this,'format: 1');" onBlur="DateFieldCheckBlur(this);" class="fieldSM" value="#ArrivalAtPUDate#"></td>
+				<td></td>
+<!--- 			         	</cfoutput>
+ 							<select name="Trn_Symb_List" id="TrSymLst" size="1" style="visibility:hidden" class="txtsv"  required="yes">
+							<option value=""></option>
+			            	<cfoutput query="TrainInfo">
+							<option value="#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#">#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#</option>
+			            	</cfoutput>
+							</select></td>
+						<cfoutput query="Source">
+ --->			</tr>
+			<tr>
+			    <td align="right">Actual Pickup Time*:</td>
+			    <td align="left"><input type="textbox" size="7" maxlength="10" name="ActualPUTime" onFocus="timeFormatVerify(this,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onBlur="chkActualPU(document.main.ArrivalAtPU.value, document.main.ActualPUTime.value);" class="fieldSM" value="#ActualPUTime#" class="fieldSM" style="background-color: rgb(255,255,204);" tabindex="7"></td>
+			    <td align="left"><input type="textbox" size="12" maxlength="10" name="ActualPUDate" onChange="DateFieldCheck(this,'format: 1');" onBlur="DateFieldCheckBlur(this);" class="fieldSM" value="#ActualPUDate#"></td>
+	         	<td align="right">Van Nbr:</td>
+	         	</cfoutput>
+       			<td>
+					<select name="VanNbr" size="1" class="txtsv" tabindex="10">
+<!--- 					<option value="#VanNbr#" selected="selected"></option>
+ --->           			<cfoutput query="VanInfo">
+					<cfif #VanInfo.VanNbr# eq #Source.VanNbr#>
+					<option value="#VanInfo.VanNbr#" selected="true">#VanInfo.VanNbr#</option>
+					<cfelse>
+					<option value="#VanInfo.VanNbr#">#VanInfo.VanNbr#</option>
+					</cfif>
+           			</cfoutput>
+					<cfif #Source.VanNbr# eq 'OTHER'>
+					<option value="OTHER" selected="true">OTHER</option>
+					<cfelse>
+					<option value="OTHER">OTHER</option>
+					</cfif>
+					</select>
+       			</td>
+           		<cfoutput query="Source">
+			    <td align="right">Train Symbol 1:</td>
+	            <td>
+							<input type="textbox" size="12" name="Trn_Symb_Src" id="TrSymSrc" class="fieldSM" onblur="document.main.Trn_Symb_Src.value = document.main.Trn_Symb_Src.value.toUpperCase();" value="#Trn_Symb# #Trn_Day#" tabindex="13">
+<!--- 					<select name="Trn_Symb_Src" size="1" class="txtsv" style="width: 100px;" tabindex="5">
+					<option value=""></option>
+			        <cfoutput query="TrainInfo">
+                  	<cfif #TrainInfo.Trn_Symb# eq #Source.Trn_Symb# AND #TrainInfo.Trn_Day# eq #Source.Trn_Day#>
+						<option value="#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#" selected="true">#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#</option>
+                  	<cfelse>
+						<option value="#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#">#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#</option>
+                  	</cfif>
+			        </cfoutput>
+					</select>
+ --->	            </td>
+<!--- 			    <td align="right">Van Type:</td>
+ --->			    <td align="left"><input type="hidden" size="15" maxlength="5" name="VanType" class="fieldSM" value="#VanType#" readonly="true" style="background-color: rgb(192,192,192);"></td>
+			</tr>
+			<tr>
+			    <td align="right">Arrival at Dest Time*:</td>
+			    <td align="left"><input type="textbox" size="7" maxlength="10" name="ArrivalAtDestTime" onFocus="timeFormatVerify(this,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onBlur="chkArrDest(document.main.ActualPUTime.value, document.main.ArrivalAtDestTime.value);" class="fieldSM" value="#ArrivalAtDestTime#" style="background-color: rgb(255,255,204);" tabindex="8"></td>
+			    <td align="left"><input type="textbox" size="12" maxlength="10" name="ArrivalAtDestDate" onChange="DateFieldCheck(this,'format: 1');" onBlur="DateFieldCheckBlur(this);" class="fieldSM" value="#ArrivalAtDestDate#"></td>
+			    <td align="right">Driver:</td>
+			    <td align="left"><input type="textbox" size="30" maxlength="30" name="Driver" class="fieldSM" value="#Driver#" tabindex="11"></td>
+			    <td align="right">Train Symbol 2:</td>
+            			<td>
+							<input type="textbox" size="12" name="Trn_Symb_Src2" id="TrSymSrc2" class="fieldSM" onblur="document.main.Trn_Symb_Src2.value = document.main.Trn_Symb_Src2.value.toUpperCase();" value="#Trn_Symb2# #Trn_Day2#" tabindex="14">
+           				</td>
+<!--- 	            <td>
+		            </cfoutput>
+					<select name="Trn_Symb_Src2" size="1" class="txtsv" style="width: 100px;" tabindex="5">
+					<option value=""></option>
+			        <cfoutput query="TrainInfo">
+                  	<cfif #TrainInfo.Trn_Symb# eq #Source.Trn_Symb2# AND #TrainInfo.Trn_Day# eq #Source.Trn_Day2#>
+						<option value="#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#" selected="true">#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#</option>
+                  	<cfelse>
+						<option value="#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#">#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#</option>
+                  	</cfif>
+			        </cfoutput>
+					</select>
+	            </td>
+           		<cfoutput query="Source">
+ ---><!--- 			    <td align="right">Van Nbr:</td>
+			    <td align="left"><input type="textbox" size="15" maxlength="12" name="VanNbr" class="fieldSM" value="#VanNbr#" readonly="true" style="background-color: rgb(192,192,192);"></td>
+ ---><!---             		<cfset CurrentVanNbr = #VanNbr#>
+            		</cfoutput>
+					<select name="VanNbr" size="1" class="txtsv" readonly="true" style="background-color: rgb(192,192,192);">
+						<option value="" selected="selected"></option>
+            			<cfoutput query="VanInfo">
+						<cfif isDefined("CurrentVanNbr") and #CurrentVanNbr# eq #VanNbr#>
+							<option value="#VanNbr#" selected="selected">#VanNbr#</option>
+						<cfelse>
+							<option value="#VanNbr#">#VanNbr#</option>
+            			</cfif>
+            		</cfoutput>
+					</select>
+ --->		</tr>
+			<tr>
+<!---             	<cfoutput query="Source">
+ --->
+
+				<cfset Seg = #Segment#>
+				<cfif Int(#Seg#) lt Int(#MaxSeg#)>
+				<td></td>
+			    <td align="left"><input type="hidden" size="7" maxlength="10" name="ReturnToHubTime" onFocus="timeFormatVerify(this,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onBlur="chkRetHub(document.main.ArrivalAtDestTime.value, document.main.ReturnToHubTime.value);" class="fieldSM" value="#ReturnToHubTime#" style="background-color: rgb(255,255,204);" tabindex="9"></td>
+			    <td align="left"><input type="hidden" size="12" maxlength="10" name="ReturnToHubDate" onChange="DateFieldCheck(this,'format: 1');" onBlur="DateFieldCheckBlur(this);" class="fieldSM" value="#ReturnToHubDate#"></td>
+				<cfelse>	
+			    <td align="right">Return to Hub Time*:</td>
+			    <td align="left"><input type="textbox" size="7" maxlength="10" name="ReturnToHubTime" onFocus="timeFormatVerify(this,'Style: 24','Seconds: 0','AMPM: 1','TimeZone: 0');" onBlur="chkRetHub(document.main.ArrivalAtDestTime.value, document.main.ReturnToHubTime.value);" class="fieldSM" value="#ReturnToHubTime#" style="background-color: rgb(255,255,204);" tabindex="9"></td>
+			    <td align="left"><input type="textbox" size="12" maxlength="10" name="ReturnToHubDate" onChange="DateFieldCheck(this,'format: 1');" onBlur="DateFieldCheckBlur(this);" class="fieldSM" value="#ReturnToHubDate#"></td>
+				</cfif>
+	         	<td align="right">Crew:</td>
+			    <td align="left"><input type="textbox" size="30" maxlength="30" name="CrewInfo" class="fieldSM" value="#CrewInfo#" tabindex="12"></td>
+			    <td align="right">Train Symbol 3:</td>
+            			<td>
+							<input type="textbox" size="12" name="Trn_Symb_Src3" id="TrSymSrc3" class="fieldSM" onblur="document.main.Trn_Symb_Src3.value = document.main.Trn_Symb_Src3.value.toUpperCase();" value="#Trn_Symb3# #Trn_Day3#" tabindex="15">
+						</td>
+<!--- 	            <td>
+		            </cfoutput>
+					<select name="Trn_Symb_Src3" size="1" class="txtsv" style="width: 100px;" tabindex="5">
+					<option value=""></option>
+			        <cfoutput query="TrainInfo">
+                  	<cfif #TrainInfo.Trn_Symb# eq #Source.Trn_Symb3# AND #TrainInfo.Trn_Day# eq #Source.Trn_Day3#>
+						<option value="#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#" selected="true">#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#</option>
+                  	<cfelse>
+						<option value="#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#">#TrainInfo.Trn_Symb# #TrainInfo.Trn_Day#</option>
+                  	</cfif>
+			        </cfoutput>
+					</select>
+	            </td>
+           		<cfoutput query="Source">
+ --->				<cfset OrderDate = "#OrderDate#">
+				<cfset OrderTime = "#OrderTime#">				
+				<cfset OkClose = "Y">
+					<cfloop query="ChkClose">
+ 						<cfif #CloseSeg# neq #MaxSeg#>
+							<cfset OkClose = "N">
+						</cfif>
+					</cfloop>
+	    		<td align="left"><input type="hidden" size="30" maxlength="30" name="CloseOK" class="fieldSM" value="#OkClose#"></td>
+			</tr>
+           	<tr><td colspan="11" align="center" style="font-size: 10px; color: red;">* <i>Arrival at Dest Time</i>, <i>Arr at Pickup</i>, <i>Actual Pickup Time</i> and <i>Return to Hub Time</i> must be filled in for <strong>ALL SEGMENTS</strong> to Close Record.</td></tr>
+          </table>
+         </td>
+        </tr>
+		<tr>
+         	<td align="center" class="TopRow"><b>Comments</b></td>
+        </tr>
+		<tr>
+        	<td align="center">
+   			<table cellpadding="5" cellspacing="0" border="0" width="100%">
+    		<tr>
+				<td align="right">Comments:</td>
+			    <td align="left"><textarea name="comments" cols=140 rows=7 class="fieldSM" tabindex="16">#comments#</textarea></td>
+           	</tr>
+          	</table>
+         	</td>
+        </tr>
+        <tr><td align="center">&nbsp;</td></tr>
+        <tr><td align="center" class="TopRow">&nbsp;</td></tr>
+        <tr>
+        	<td>
+   			<table cellpadding="5" cellspacing="0" border="0" width="100%">
+    		<tr>
+     			<td width="30%">&nbsp;</td>
+			    <td align="center"><input type="button" onclick="EditRecord();" value=" Save Segment"></td>
+			    <td align="center"><input type="button" onclick="CloseRecord(document.main.ArrivalAtDestTime.value, document.main.ArrivalAtPU.value, document.main.ActualPUTime.value,  document.main.ReturnToHubTime.value);" value=" Close Record "></td>
+			    <td align="center"><input type="button" onclick="DeleteRecord(document.main.RVT_ID.value, document.main.Hub_Filter.value, document.main.Segment.value, document.main.MaxSegment.value);" value=" Delete Segment "></td>
+				<td width="30%">&nbsp;</td>
+<!---      			<td width="30%">&nbsp;</td> --->
+           	</tr>
+			<tr align="center">
+<!--- javascript: void FilterReturn()
+ --->				<td colspan="10" align="center"><a href="./RVT_Main.cfm?Hub_Filter=#url.Hub_Filter#">Return to Hub Filter Page</a></td>
+			</tr>
+          	</table>
+         	</td>
+        </tr>
+		</table>
+							<CF_SSI VIRTUAL="/ssi/apps/groupbox/endgroupbox.txt">
+							</form>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+</cfoutput>
+	<CF_SSI VIRTUAL="/ssi/apps/pleasewait/inlinePleaseWaitEnd.txt">
+	<CF_SSI VIRTUAL="/ssi/apps/footer.txt">
+</body>
+</html>
